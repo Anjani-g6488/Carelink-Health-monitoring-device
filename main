@@ -1,0 +1,83 @@
+#define BLYNK_TEMPLATE_ID "TMPL3Z2H0Lw9w"
+#define BLYNK_TEMPLATE_NAME "Temperature monitor using DS18B20"
+#define BLYNK_AUTH_TOKEN "CqQhmGyo-9hGrrxAyNDUp3Cd2dKrfT4b"
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiUdp.h>
+#include <BlynkSimpleEsp32.h>
+
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// WiFi credentials
+char ssid[] = "SHIDDHIVINAYAK OLD Gr.";
+char pass[] = "987654321@";
+
+// Blynk virtual pin
+#define VIRTUAL_PIN V0
+
+// DS18B20 setup
+#define ONE_WIRE_BUS 4  // GPIO4 (D4)
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+// UDP setup
+WiFiUDP udp;
+const char* udpAddress = "192.168.1.115"; // 🧠 Replace with YOUR LAPTOP IP
+const int udpPort = 5005;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(ONE_WIRE_BUS, INPUT_PULLUP);
+
+  sensors.begin();
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  // Wait for connection
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi connected!");
+  Serial.print("📡 ESP32 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Start UDP
+  udp.begin(WiFi.localIP(), udpPort); // Optional: Start UDP server (not needed for sending)
+}
+
+void loop() {
+  Blynk.run();
+
+  static unsigned long lastReadTime = 0;
+  if (millis() - lastReadTime > 5000) { // every 5 seconds
+    lastReadTime = millis();
+
+    sensors.requestTemperatures();
+    float tempC = sensors.getTempCByIndex(0);
+
+    // Print to Serial
+    Serial.print("🌡️ Temp: ");
+    Serial.print(tempC);
+    Serial.println(" °C");
+
+    // Send to Blynk
+    Blynk.virtualWrite(VIRTUAL_PIN, tempC);
+
+    // Send via UDP
+    String tempStr = String(tempC, 2);
+    Serial.print("📤 Sending UDP to ");
+    Serial.print(udpAddress);
+    Serial.print(":");
+    Serial.print(udpPort);
+    Serial.print(" -> ");
+    Serial.println(tempStr);
+
+    udp.beginPacket(udpAddress, udpPort);
+    udp.print(tempStr);
+    udp.endPacket();
+  }
+}
+     cpp code main
